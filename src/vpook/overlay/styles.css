@@ -1,0 +1,36 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: sans-serif;
+}
+
+.stage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 60%);
+}
+
+#avatar {
+  max-width: min(70vw, 520px);
+  max-height: min(80vh, 720px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform-origin: center bottom;
+  transition:
+    transform 80ms linear,
+    filter 80ms linear,
+    opacity 120ms ease;
+  will-change: transform, filter, opacity;
+  user-select: none;
+  pointer-events: none;
+}

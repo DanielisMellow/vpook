@@ -1,0 +1,133 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vpook"
+version = "0.1.0"
+description = "Virtual Pookie OBS avatar overlay service"
+requires-python = ">=3.12"
+dependencies = [
+  "websockets>=12,<16",
+]
+
+[project.optional-dependencies]
+windows-audio = [
+  "numpy>=1.26",
+  "PyAudioWPatch>=0.2.12.7; platform_system == 'Windows'",
+]
+
+[dependency-groups]
+dev = [ "ruff==0.13.2", "pytest==8.4.1"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vpook = ["overlay/*.html", "overlay/*.js", "overlay/*.css"]
+
+
+# ---------------------------
+# Ruff: core project settings
+# ---------------------------
+[tool.ruff]
+src = ["src", "apps"]
+target-version = "py312"
+line-length = 88
+indent-width = 4
+extend-exclude = ["CVS", "**/.#*", ".venv", ".tox", "build", "dist", "release"]
+
+
+# ------------------------------
+# Ruff Lint: rule families to run
+# ------------------------------
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "D",   # pydocstyle
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "PL",  # pylint-like rules
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "G",   # flake8-logging-format
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "BLE", # flake8-blind-except (see note below)
+    "RET", # flake8-return
+    "A",   # flake8-builtins
+    "RUF", # Ruff-specific
+]
+# To ENFORCE no bare/over-broad excepts, keep BLE and REMOVE E722 below
+# To ALLOW them, either drop "BLE" from select or add BLE001/BLE002 to ignore section
+# Choosing to enforce at this time
+ignore = [
+    "W605", # invalid escape sequence noise (use raw strings for regexes)
+]
+
+logger-objects = ["logging"]
+
+
+# -------------------------------------------------
+# Unused/dummy variable patterns
+# -------------------------------------------------
+dummy-variable-rgx = "^(_+|dummy|ignored_|unused_)"
+
+# Pylint allowed long URLs via ignore-long-lines; Ruff has no pattern whitelist
+# If E501 is triggered by a long URL, add an inline '# noqa: E501' on that line
+
+# Optional convenience to re-export from package inits:
+# allow re-export without unused-import noise
+# [tool.ruff.lint.per-file-ignores]
+# "__init__.py" = ["F401"]
+
+
+# ------------------------------------------------
+# Pylint-like thresholds (design/complexity limits)
+# ------------------------------------------------
+[tool.ruff.lint.pylint]
+max-args = 7
+max-bool-expr = 5
+max-branches = 20
+max-locals = 15
+max-public-methods = 20
+max-returns = 8
+max-statements = 80
+max-nested-blocks = 5
+
+
+# ------------------------------------------------
+# Using google style guide docstring convention
+# ------------------------------------------------
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+
+# --------------------------------------
+# Import sorting (isort) configuration
+# --------------------------------------
+[tool.ruff.lint.isort]
+known-third-party = []
+
+
+# -----------------------------------------------------------
+# Naming exceptions to complement pep8-naming's defaults
+# -----------------------------------------------------------
+[tool.ruff.lint.pep8-naming]
+ignore-names = ["Run"]
+
+
+# ----------------
+# Ruff Formatter
+# ----------------
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true # Format code blocks inside docstrings
