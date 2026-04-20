@@ -29,6 +29,9 @@ pip-wheel-metadata/
 .nox/
 *.log
 
+# Claude Code
+.claude/
+
 # IDE and editor files
 .vscode/
 .idea/

@@ -12,7 +12,8 @@
 
 ## Repository Layout
 
-- `apps/overlay_service.py`: configurable entrypoint for running the service
+- `apps/overlay_service_args.py`: CLI entrypoint — configure the service via command-line flags
+- `apps/overlay_service.py`: file-based entrypoint — configure by editing Python constants at the top
 - `apps/overlay_service_logging.py`: logging setup
 - `apps/assets/`: user-owned avatar images served by the HTTP server
 - `src/vpook/app.py`: main application loop
@@ -25,6 +26,7 @@
 ## Requirements
 
 - Python `3.12+`
+- [`just`](https://github.com/casey/just) task runner
 - Windows for live audio capture (WASAPI loopback or per-app session metering)
 - OBS or any browser source consumer to display the overlay visually
 
@@ -32,16 +34,24 @@
 
 ### Windows PowerShell
 
+Install `just` if you don't have it:
+
 ```powershell
-py -3.12 -m venv .venv
+winget install Casey.Just
+```
+
+Then set up the environment:
+
+```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-make install-windows
+just install-windows
 ```
 
 If PowerShell blocks activation:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ### macOS or Linux
@@ -49,21 +59,26 @@ Set-ExecutionPolicy -Scope Process Bypass
 The fake provider works cross-platform for development.
 
 ```bash
-python3.12 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-make install
+just install
 ```
 
 ## Running The Service
 
-From the repo root:
+From the repo root with the virtual environment active:
 
 ```bash
-python apps/overlay_service.py
+just run               # fake audio (default, cross-platform)
+just run-discord       # per-app session metering targeting Discord
 ```
 
-This expects `vpook` to be installed into the active environment, which `make install`
-and `make install-windows` do in editable mode.
+Extra flags are passed through to the entrypoint:
+
+```bash
+just run --wasapi
+just run --process --target-process chrome
+```
 
 Once the service is running:
 
@@ -72,35 +87,58 @@ Once the service is running:
 
 ## Selecting An Audio Provider
 
-All provider config lives in `apps/overlay_service.py`. Enable exactly one of the three flags.
+The CLI entrypoint (`overlay_service_args.py`) accepts flags to choose a provider. Pass exactly one provider flag.
 
 ### Fake (default — cross-platform)
 
-```python
-USE_FAKE_AUDIO = True
+```bash
+just run
+# or explicitly:
+just run --fake
 ```
 
 Generates a deterministic idle/talking cycle. No audio hardware required. Good for verifying the overlay and WebSocket transport without needing Windows.
 
 ### Device loopback — capture everything on an output device
 
-```python
-USE_FAKE_AUDIO = False
-USE_DEVICE_LOOPBACK = True
-WINDOWS_LOOPBACK_DEVICE_NAME = None  # None = system default; or e.g. "Headphones"
+```bash
+just run --wasapi
+# target a specific device by name substring:
+just run --wasapi --audio-device "Headphones"
 ```
 
 Captures the full mix of whatever is playing through a Windows output device via WASAPI loopback. Picks up all apps at once — Discord, game audio, music, everything.
 
 ### Per-app session metering — isolate one application
 
-```python
-USE_FAKE_AUDIO = False
-USE_PROCESS_AUDIO = True
-TARGET_PROCESS = "discord"  # case-insensitive substring of the .exe name
+```bash
+just run --process --target-process discord
+# shortcut:
+just run-discord
 ```
 
-Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak volume for a specific process only. Discord is the default target. Useful when streaming — the game audio won't bleed into voice detection. The service auto-recovers if the target app is restarted.
+Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak volume for a specific process only. Discord is the default target. Useful when streaming — game audio won't bleed into voice detection. The service auto-recovers if the target app is restarted.
+
+### All available flags
+
+```
+--fake                      Use fake sine-wave audio (default)
+--wasapi                    Capture system audio via WASAPI loopback
+--process                   Capture a specific app's audio via Windows Audio Session API
+--target-process NAME       Process name substring to monitor (default: discord)
+--audio-device NAME         Loopback device name substring (default: system output)
+--threshold FLOAT           Volume threshold for VAD (default: 0.08)
+--attack-ms MS              Time above threshold before switching to talking (default: 120)
+--release-ms MS             Time below threshold before switching to idle (default: 300)
+--http-host HOST            HTTP bind address (default: 127.0.0.1)
+--http-port PORT            HTTP port (default: 8000)
+--websocket-host HOST       WebSocket bind address (default: 127.0.0.1)
+--websocket-port PORT       WebSocket port (default: 8765)
+--tick-ms MS                Main loop interval (default: 50)
+--log-level LEVEL           DEBUG, INFO, WARNING, or ERROR (default: INFO)
+```
+
+Alternatively, edit constants directly in `apps/overlay_service.py` and run it with `python apps/overlay_service.py` if you prefer not to use flags.
 
 ## Assets
 
@@ -117,24 +155,11 @@ apps/assets/
 
 If you replace those files, the overlay will serve your new images. The HTTP server rejects asset paths that escape the asset root.
 
-## Runtime Defaults
-
-Current defaults from `AppConfig`:
-
-- HTTP host: `127.0.0.1`
-- HTTP port: `8000`
-- WebSocket host: `127.0.0.1`
-- WebSocket port: `8765`
-- Tick interval: `50ms`
-- Voice threshold: `0.08`
-- Attack: `120ms`
-- Release: `300ms`
-
 ## Architecture
 
 ### High-Level Flow
 
-1. `apps/overlay_service.py` builds an `AppConfig` and starts the app.
+1. `apps/overlay_service_args.py` parses CLI flags, builds an `AppConfig`, and starts the app.
 2. `src/vpook/app.py` creates the audio provider, voice activity detector, WebSocket state server, and static HTTP server.
 3. The app loop samples audio every `tick_ms`.
 4. `VoiceActivityDetector` turns raw volume into a stable `talking` or `idle` state using threshold, attack, and release timing.
@@ -205,7 +230,13 @@ The browser client does not do voice detection itself. It only renders the state
 
 ### Tune Detection Sensitivity
 
-Edit values in `src/vpook/config.py`:
+Pass flags when running:
+
+```bash
+just run --threshold 0.05 --attack-ms 80 --release-ms 500
+```
+
+Or edit defaults in `src/vpook/config.py`:
 
 - `threshold`
 - `attack_ms`
@@ -213,7 +244,11 @@ Edit values in `src/vpook/config.py`:
 
 ### Change Bind Addresses Or Ports
 
-Edit these in `AppConfig`:
+```bash
+just run --http-port 8080 --websocket-port 9000
+```
+
+Or edit these in `AppConfig`:
 
 - `http_host`
 - `http_port`
@@ -224,42 +259,36 @@ Edit these in `AppConfig`:
 
 ### `ModuleNotFoundError: No module named 'vpook'`
 
-`vpook` uses a `src/` layout, so `python apps/overlay_service.py` only works after the
-package is installed into the active environment. From the repo root, run:
+`vpook` uses a `src/` layout, so the package must be installed into the active environment first. From the repo root, run:
 
 ```bash
-make install
+just install
 ```
 
 On Windows, use:
 
 ```powershell
-make install-windows
+just install-windows
 ```
 
-Then rerun:
-
-```bash
-python apps/overlay_service.py
-```
+Then rerun the service.
 
 ### WebSocket Or HTTP Bind Errors
 
 If you see an address-in-use or bind failure:
 
 - check whether another process is already using port `8000` or `8765`
-- change the ports in `AppConfig`
-- rerun the service
+- pass different ports: `just run --http-port 8080 --websocket-port 9000`
 
 ### No Real Audio On Windows
 
-**Device loopback (`USE_DEVICE_LOOPBACK`):**
-- confirm `.[windows-audio]` was installed (`make install-windows`)
+**Device loopback (`--wasapi`):**
+- confirm `.[windows-audio]` was installed (`just install-windows`)
 - confirm the selected output device is active and playing audio
-- set `WINDOWS_LOOPBACK_DEVICE_NAME` to a substring of the target device name if the default isn't picked up
+- pass `--audio-device` with a substring of the target device name if the default isn't picked up
 
-**Per-app session metering (`USE_PROCESS_AUDIO`):**
-- confirm `.[windows-audio]` was installed (`make install-windows`)
+**Per-app session metering (`--process`):**
+- confirm `.[windows-audio]` was installed (`just install-windows`)
 - make sure the target app is open and joined to a voice channel — Windows only creates an audio session once the app is actively outputting audio
 - if the app was just launched, wait up to 5 seconds for the session to be discovered
 - check logs for `No active audio sessions found for process '...'`
@@ -269,13 +298,15 @@ If you see an address-in-use or bind failure:
 - open browser devtools and confirm `/config.json` loads
 - confirm the WebSocket connection to `ws://127.0.0.1:8765` succeeds
 - verify the backend logs show voice state transitions
-- if using real audio, lower the threshold slightly
+- if using real audio, lower the threshold: `just run --threshold 0.04`
 
 ## Development
 
 Formatting and linting are wired through `ruff`:
 
 ```bash
-make lint
-make format
+just lint
+just lint-verbose
+just format
+just format-diff
 ```
