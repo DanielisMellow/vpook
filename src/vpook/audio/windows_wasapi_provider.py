@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 
@@ -40,6 +41,7 @@ class WindowsWasapiProvider(AudioProvider):
         self._frames_per_buffer: int = 1024
         # Rolling window for smoothing volume spikes
         self._smooth: deque[float] = deque(maxlen=_SMOOTH_WINDOW)
+        self._lock = threading.Lock()
         self._logger.debug("Initialized Windows WASAPI loopback provider.")
 
     @property
@@ -93,14 +95,15 @@ class WindowsWasapiProvider(AudioProvider):
 
     def stop(self) -> None:
         """Stop and close the WASAPI stream, then terminate PyAudio."""
-        if self._stream is not None:
-            self._stream.stop_stream()
-            self._stream.close()
-            self._stream = None
-        if self._pa is not None:
-            self._pa.terminate()
-            self._pa = None
-        self._smooth.clear()
+        with self._lock:
+            if self._stream is not None:
+                self._stream.stop_stream()
+                self._stream.close()
+                self._stream = None
+            if self._pa is not None:
+                self._pa.terminate()
+                self._pa = None
+            self._smooth.clear()
         self._logger.debug("Windows WASAPI loopback provider stopped.")
 
     # ------------------------------------------------------------------
@@ -116,21 +119,22 @@ class WindowsWasapiProvider(AudioProvider):
         Raises:
             RuntimeError: If the provider has not been started.
         """
-        if self._stream is None:
-            raise RuntimeError("Provider not started. Call start() first.")
+        with self._lock:
+            if self._stream is None:
+                raise RuntimeError("Provider not started. Call start() first.")
 
-        raw = self._stream.read(self._frames_per_buffer, exception_on_overflow=False)
-        samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
-        if samples.size == 0:
-            self._smooth.append(0.0)
-            return AudioLevel(volume=0.0, timestamp=time.monotonic())
+            raw = self._stream.read(self._frames_per_buffer, exception_on_overflow=False)
+            samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+            if samples.size == 0:
+                self._smooth.append(0.0)
+                return AudioLevel(volume=0.0, timestamp=time.monotonic())
 
-        # RMS normalised to [0, 1] (int16 max = 32768)
-        rms = float(np.sqrt(np.mean(samples**2))) / 32768.0
+            # RMS normalised to [0, 1] (int16 max = 32768)
+            rms = float(np.sqrt(np.mean(samples**2))) / 32768.0
 
-        # Light smoothing so animation doesn't strobe on transients
-        self._smooth.append(rms)
-        smoothed = float(np.mean(self._smooth))
+            # Light smoothing so animation doesn't strobe on transients
+            self._smooth.append(rms)
+            smoothed = float(np.mean(self._smooth))
 
         return AudioLevel(volume=min(smoothed, 1.0), timestamp=time.monotonic())
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 
@@ -42,6 +43,7 @@ class WindowsAudioSessionProvider(AudioProvider):
         self._last_refresh: float = 0.0
         self._smooth: deque[float] = deque(maxlen=_SMOOTH_WINDOW)
         self._started = False
+        self._lock = threading.Lock()
 
     @property
     def name(self) -> str:
@@ -73,10 +75,11 @@ class WindowsAudioSessionProvider(AudioProvider):
 
     def stop(self) -> None:
         """Release session references."""
-        self._meters.clear()
-        self._smooth.clear()
-        self._last_refresh = 0.0
-        self._started = False
+        with self._lock:
+            self._meters.clear()
+            self._smooth.clear()
+            self._last_refresh = 0.0
+            self._started = False
         self._logger.debug("Windows Audio Session provider stopped.")
 
     # ------------------------------------------------------------------
@@ -93,28 +96,29 @@ class WindowsAudioSessionProvider(AudioProvider):
             AudioLevel: Smoothed peak audio level snapshot. Returns 0.0 volume
                 when the target process has no active audio session.
         """
-        if not self._started:
-            raise RuntimeError("Provider not started. Call start() first.")
+        with self._lock:
+            if not self._started:
+                raise RuntimeError("Provider not started. Call start() first.")
 
-        now = time.monotonic()
-        if now - self._last_refresh > _SESSION_REFRESH_INTERVAL:
-            self._refresh_sessions()
+            now = time.monotonic()
+            if now - self._last_refresh > _SESSION_REFRESH_INTERVAL:
+                self._refresh_sessions()
 
-        peak = 0.0
-        dead: list[int] = []
+            peak = 0.0
+            dead: list[int] = []
 
-        for i, meter in enumerate(self._meters):
-            try:
-                peak = max(peak, meter.GetPeakValue())
-            except Exception:  # noqa: BLE001
-                # Session was closed (app exited, device changed, etc.)
-                dead.append(i)
+            for i, meter in enumerate(self._meters):
+                try:
+                    peak = max(peak, meter.GetPeakValue())
+                except Exception:  # noqa: BLE001
+                    # Session was closed (app exited, device changed, etc.)
+                    dead.append(i)
 
-        for i in reversed(dead):
-            self._meters.pop(i)
+            for i in reversed(dead):
+                self._meters.pop(i)
 
-        self._smooth.append(peak)
-        smoothed = float(sum(self._smooth) / len(self._smooth))
+            self._smooth.append(peak)
+            smoothed = float(sum(self._smooth) / len(self._smooth))
         return AudioLevel(volume=min(smoothed, 1.0), timestamp=now)
 
     # ------------------------------------------------------------------
