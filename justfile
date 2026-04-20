@@ -23,13 +23,17 @@ install-windows:
 
 # -------- Run --------
 
-# Run the overlay service (args-based, fake audio by default)
+# Run the overlay service (fake audio by default)
 run *args:
-    {{ python }} apps/overlay_service_args.py {{ args }}
+    {{ python }} apps/overlay_service.py {{ args }}
 
 # Run the overlay service targeting Discord audio
 run-discord *args:
-    {{ python }} apps/overlay_service_args.py --process --target-process discord {{ args }}
+    {{ python }} apps/overlay_service.py --process --target-process discord {{ args }}
+
+# Run the overlay service bound to all interfaces for LAN access (WASAPI)
+run-lan *args:
+    {{ python }} apps/overlay_service.py --host 0.0.0.0 --wasapi {{ args }}
 
 # -------- Linting (dev) --------
 

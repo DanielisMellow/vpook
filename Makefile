@@ -10,8 +10,9 @@ help:
 	@echo "  help              - Display this help message"
 	@echo "  install           - Install vpook in editable mode in the active environment"
 	@echo "  install-windows   - Install vpook with Windows audio extras in editable mode"
-	@echo "  run               - Run the overlay service (args-based, fake audio by default)"
+	@echo "  run               - Run the overlay service (fake audio by default)"
 	@echo "  run-discord       - Run the overlay service targeting Discord audio"
+	@echo "  run-lan           - Run the overlay service bound to all interfaces for LAN access (WASAPI)"
 	@echo "  lint              - Run ruff check (concise, non-failing)"
 	@echo "  lint-verbose      - Run ruff check (full output, non-failing)"
 	@echo "  format            - Apply ruff formatting to the repository"
@@ -31,11 +32,15 @@ install-windows:
 # -------- Run --------
 .PHONY: run
 run:
-	@$(PYTHON) apps/overlay_service_args.py $(ARGS)
+	@$(PYTHON) apps/overlay_service.py $(ARGS)
 
 .PHONY: run-discord
 run-discord:
-	@$(PYTHON) apps/overlay_service_args.py --process --target-process discord $(ARGS)
+	@$(PYTHON) apps/overlay_service.py --process --target-process discord $(ARGS)
+
+.PHONY: run-lan
+run-lan:
+	@$(PYTHON) apps/overlay_service.py --host 0.0.0.0 --wasapi $(ARGS)
 
 # -------- Linting (dev) --------
 .PHONY: lint

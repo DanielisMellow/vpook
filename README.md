@@ -12,8 +12,8 @@
 
 ## Repository Layout
 
-- `apps/overlay_service_args.py`: CLI entrypoint — configure the service via command-line flags
-- `apps/overlay_service.py`: file-based entrypoint — configure by editing Python constants at the top
+- `apps/overlay_service.py`: entrypoint — parses args and starts the service
+- `apps/overlay_service_args.py`: argument parsing and config building
 - `apps/overlay_service_logging.py`: logging setup
 - `apps/assets/`: user-owned avatar images served by the HTTP server
 - `src/vpook/app.py`: main application loop
@@ -25,34 +25,56 @@
 
 ## Requirements
 
-- Python `3.12+`
+- Windows (for live audio capture via WASAPI)
+- Python 3.12
 - [`just`](https://github.com/casey/just) task runner
-- Windows for live audio capture (WASAPI loopback or per-app session metering)
 - OBS or any browser source consumer to display the overlay visually
 
 ## Setup
 
 ### Windows PowerShell
 
-Install `just` if you don't have it:
+**1. Install Python 3.12**
+
+```powershell
+winget install Python.Python.3.12
+```
+
+Close and reopen PowerShell after this so `python` is on your PATH.
+
+**2. Install `just`**
 
 ```powershell
 winget install Casey.Just
 ```
 
-Then set up the environment:
+**3. Clone the repo and create a virtual environment**
 
 ```powershell
+git clone <repo-url>
+cd vpook
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-just install-windows
 ```
 
-If PowerShell blocks activation:
+**4. Activate the virtual environment**
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation, run this once and then retry step 4:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
+
+**5. Install vpook**
+
+```powershell
+just install-windows
+```
+
+You should see `(.venv)` in your prompt before running any `just` commands. Re-run step 4 any time you open a new terminal.
 
 ### macOS or Linux
 
@@ -71,6 +93,7 @@ From the repo root with the virtual environment active:
 ```bash
 just run               # fake audio (default, cross-platform)
 just run-discord       # per-app session metering targeting Discord
+just run-lan           # bind to all interfaces for LAN access (WASAPI)
 ```
 
 Extra flags are passed through to the entrypoint:
@@ -84,6 +107,21 @@ Once the service is running:
 
 - Open `http://127.0.0.1:8000` in a browser to preview the overlay
 - Add that URL as a Browser Source in OBS if you want to use it in a scene
+
+### LAN / Local Network
+
+`just run-lan` binds both servers to `0.0.0.0` so other devices on your network can use the overlay. The service auto-detects your LAN IP and uses it in `config.json` so remote browsers connect to the right WebSocket address.
+
+On another device (or OBS on a separate PC):
+
+1. Add `http://<your-ip>:8000` as a Browser Source
+2. Both ports `8000` (HTTP) and `8765` (WebSocket) must be reachable — Windows Defender will prompt to allow them on first run
+
+To use a specific Discord audio session over LAN:
+
+```bash
+just run --host 0.0.0.0 --process --target-process discord
+```
 
 ## Selecting An Audio Provider
 
@@ -130,6 +168,7 @@ Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak v
 --threshold FLOAT           Volume threshold for VAD (default: 0.08)
 --attack-ms MS              Time above threshold before switching to talking (default: 120)
 --release-ms MS             Time below threshold before switching to idle (default: 300)
+--host HOST                 Bind address for both HTTP and WebSocket (overrides --http-host and --websocket-host)
 --http-host HOST            HTTP bind address (default: 127.0.0.1)
 --http-port PORT            HTTP port (default: 8000)
 --websocket-host HOST       WebSocket bind address (default: 127.0.0.1)
@@ -137,8 +176,6 @@ Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak v
 --tick-ms MS                Main loop interval (default: 50)
 --log-level LEVEL           DEBUG, INFO, WARNING, or ERROR (default: INFO)
 ```
-
-Alternatively, edit constants directly in `apps/overlay_service.py` and run it with `python apps/overlay_service.py` if you prefer not to use flags.
 
 ## Assets
 
@@ -159,7 +196,7 @@ If you replace those files, the overlay will serve your new images. The HTTP ser
 
 ### High-Level Flow
 
-1. `apps/overlay_service_args.py` parses CLI flags, builds an `AppConfig`, and starts the app.
+1. `apps/overlay_service.py` parses CLI flags, builds an `AppConfig`, and starts the app.
 2. `src/vpook/app.py` creates the audio provider, voice activity detector, WebSocket state server, and static HTTP server.
 3. The app loop samples audio every `tick_ms`.
 4. `VoiceActivityDetector` turns raw volume into a stable `talking` or `idle` state using threshold, attack, and release timing.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import mimetypes
+import socket
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +13,21 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from vpook.config import AppConfig
+
+
+def _resolve_websocket_host(host: str) -> str:
+    """Resolve bind address to a routable address for use in config.json.
+
+    When the server binds to ``0.0.0.0``, remote clients cannot use that as a
+    WebSocket address. This function detects the machine's LAN IP in that case
+    so the browser receives a URL it can actually connect to.
+    """
+    if host == "0.0.0.0":
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return host
+    return host
 
 
 class StaticServer:
@@ -108,7 +124,7 @@ class StaticServer:
                     return
                 if route == "/config.json":
                     payload = {
-                        "websocketUrl": f"ws://{config.websocket_host}:{config.websocket_port}",
+                        "websocketUrl": f"ws://{_resolve_websocket_host(config.websocket_host)}:{config.websocket_port}",
                         "avatar": {
                             "idle": config.avatar.idle_image,
                             "talking": config.avatar.talking_image,

@@ -1,11 +1,9 @@
-"""Argparse entry point for the overlay service."""
+"""Argument parsing for the overlay service."""
 
 from __future__ import annotations
 
 import argparse
 
-from overlay_service_logging import configure_logging
-from vpook.app import main
 from vpook.config import AppConfig
 
 
@@ -78,6 +76,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     # Transport
+    parser.add_argument(
+        "--host",
+        default=None,
+        metavar="HOST",
+        help="Bind address for both HTTP and WebSocket servers. Overrides --http-host and --websocket-host.",
+    )
     parser.add_argument("--http-host", default="127.0.0.1", metavar="HOST")
     parser.add_argument("--http-port", type=int, default=8000, metavar="PORT")
     parser.add_argument("--websocket-host", default="127.0.0.1", metavar="HOST")
@@ -103,6 +107,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def build_config(args: argparse.Namespace) -> AppConfig:
+    host = args.host
     return AppConfig(
         provider=args.provider,
         target_process=args.target_process,
@@ -110,15 +115,9 @@ def build_config(args: argparse.Namespace) -> AppConfig:
         threshold=args.threshold,
         attack_ms=args.attack_ms,
         release_ms=args.release_ms,
-        http_host=args.http_host,
+        http_host=host if host is not None else args.http_host,
         http_port=args.http_port,
-        websocket_host=args.websocket_host,
+        websocket_host=host if host is not None else args.websocket_host,
         websocket_port=args.websocket_port,
         tick_ms=args.tick_ms,
     )
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    configure_logging(args.log_level)
-    main(build_config(args))
