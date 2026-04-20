@@ -61,25 +61,35 @@ class WindowsWasapiProvider(AudioProvider):
         Raises:
             RuntimeError: If audio APIs or devices are unavailable.
         """
+        self.stop()
+        self._smooth.clear()
         self._pa = pyaudio.PyAudio()
-        device_info = self._find_loopback_device()
-        self._channels = min(device_info["maxInputChannels"], 2)
-        self._sample_rate = int(device_info["defaultSampleRate"])
-        self._logger.info(
-            "Opening WASAPI loopback on '%s' (index=%s, %sch @ %sHz).",
-            device_info["name"],
-            device_info["index"],
-            self._channels,
-            self._sample_rate,
-        )
-        self._stream = self._pa.open(
-            format=pyaudio.paInt16,
-            channels=self._channels,
-            rate=self._sample_rate,
-            input=True,
-            input_device_index=device_info["index"],
-            frames_per_buffer=self._frames_per_buffer,
-        )
+        try:
+            device_info = self._find_loopback_device()
+            self._channels = min(int(device_info["maxInputChannels"]), 2)
+            if self._channels < 1:
+                raise RuntimeError(
+                    f"Loopback device '{device_info['name']}' has no input channels."
+                )
+            self._sample_rate = int(device_info["defaultSampleRate"])
+            self._logger.info(
+                "Opening WASAPI loopback on '%s' (index=%s, %sch @ %sHz).",
+                device_info["name"],
+                device_info["index"],
+                self._channels,
+                self._sample_rate,
+            )
+            self._stream = self._pa.open(
+                format=pyaudio.paInt16,
+                channels=self._channels,
+                rate=self._sample_rate,
+                input=True,
+                input_device_index=device_info["index"],
+                frames_per_buffer=self._frames_per_buffer,
+            )
+        except Exception:
+            self.stop()
+            raise
 
     def stop(self) -> None:
         """Stop and close the WASAPI stream, then terminate PyAudio."""
@@ -90,6 +100,7 @@ class WindowsWasapiProvider(AudioProvider):
         if self._pa is not None:
             self._pa.terminate()
             self._pa = None
+        self._smooth.clear()
         self._logger.debug("Windows WASAPI loopback provider stopped.")
 
     # ------------------------------------------------------------------
@@ -110,6 +121,9 @@ class WindowsWasapiProvider(AudioProvider):
 
         raw = self._stream.read(self._frames_per_buffer, exception_on_overflow=False)
         samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+        if samples.size == 0:
+            self._smooth.append(0.0)
+            return AudioLevel(volume=0.0, timestamp=time.monotonic())
 
         # RMS normalised to [0, 1] (int16 max = 32768)
         rms = float(np.sqrt(np.mean(samples**2))) / 32768.0

@@ -87,8 +87,8 @@ dummy-variable-rgx = "^(_+|dummy|ignored_|unused_)"
 
 # Optional convenience to re-export from package inits:
 # allow re-export without unused-import noise
-# [tool.ruff.lint.per-file-ignores]
-# "__init__.py" = ["F401"]
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["ARG002", "ARG005", "D", "PLC0415", "PLR2004", "S101"]
 
 
 # ------------------------------------------------

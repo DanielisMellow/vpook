@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from ctypes import POINTER, cast
 
 from vpook.audio.base import AudioProvider
 from vpook.models import AudioLevel
@@ -42,6 +41,7 @@ class WindowsAudioSessionProvider(AudioProvider):
         self._meters: list = []
         self._last_refresh: float = 0.0
         self._smooth: deque[float] = deque(maxlen=_SMOOTH_WINDOW)
+        self._started = False
 
     @property
     def name(self) -> str:
@@ -62,7 +62,10 @@ class WindowsAudioSessionProvider(AudioProvider):
         Raises:
             ImportError: If pycaw is not installed.
         """
+        self.stop()
+        self._smooth.clear()
         self._refresh_sessions()
+        self._started = True
         self._logger.info(
             "Windows Audio Session provider started, targeting process '%s'.",
             self._process_name,
@@ -71,6 +74,9 @@ class WindowsAudioSessionProvider(AudioProvider):
     def stop(self) -> None:
         """Release session references."""
         self._meters.clear()
+        self._smooth.clear()
+        self._last_refresh = 0.0
+        self._started = False
         self._logger.debug("Windows Audio Session provider stopped.")
 
     # ------------------------------------------------------------------
@@ -87,6 +93,9 @@ class WindowsAudioSessionProvider(AudioProvider):
             AudioLevel: Smoothed peak audio level snapshot. Returns 0.0 volume
                 when the target process has no active audio session.
         """
+        if not self._started:
+            raise RuntimeError("Provider not started. Call start() first.")
+
         now = time.monotonic()
         if now - self._last_refresh > _SESSION_REFRESH_INTERVAL:
             self._refresh_sessions()
@@ -117,13 +126,16 @@ class WindowsAudioSessionProvider(AudioProvider):
         from pycaw.pycaw import AudioUtilities, IAudioMeterInformation  # noqa: PLC0415
 
         self._last_refresh = time.monotonic()
-        self._meters = []
 
         try:
             sessions = AudioUtilities.GetAllSessions()
         except Exception as exc:  # noqa: BLE001
             self._logger.warning("Failed to enumerate audio sessions: %s", exc)
             return
+
+        # Only replace meters after a successful enumeration so a transient
+        # COM error does not silently zero out an otherwise healthy session.
+        new_meters: list = []
 
         for session in sessions:
             if session.Process is None:
@@ -141,10 +153,10 @@ class WindowsAudioSessionProvider(AudioProvider):
                 continue
 
             try:
-                meter = cast(session._ctl, POINTER(IAudioMeterInformation))
+                meter = session._ctl.QueryInterface(IAudioMeterInformation)
                 # Probe the interface before storing it
                 meter.GetPeakValue()
-                self._meters.append(meter)
+                new_meters.append(meter)
                 self._logger.debug(
                     "Tracking audio session: process='%s' pid=%s.",
                     session.Process.name(),
@@ -154,6 +166,8 @@ class WindowsAudioSessionProvider(AudioProvider):
                 self._logger.debug(
                     "Skipping session for '%s': %s", proc_name, exc
                 )
+
+        self._meters = new_meters
 
         if not self._meters:
             self._logger.warning(

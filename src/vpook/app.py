@@ -76,15 +76,22 @@ async def run(config: AppConfig | None = None) -> None:
     )
     static_server = StaticServer(app_config)
     tick_seconds = app_config.tick_ms / 1000.0
-
-    provider.start()
-    await websocket_server.start()
-    static_server.start()
+    provider_started = False
+    websocket_started = False
+    static_started = False
 
     try:
+        provider.start()
+        provider_started = True
+        await websocket_server.start()
+        websocket_started = True
+        static_server.start()
+        static_started = True
+
+        loop = asyncio.get_running_loop()
         last_talking: bool | None = None
         while True:
-            level = provider.read_level()
+            level = await loop.run_in_executor(None, provider.read_level)
             snapshot = detector.update(level.volume, level.timestamp)
             state = OverlayState(
                 talking=snapshot.talking,
@@ -103,9 +110,12 @@ async def run(config: AppConfig | None = None) -> None:
             await asyncio.sleep(tick_seconds)
     finally:
         LOGGER.info("Shutting down vpook services.")
-        provider.stop()
-        static_server.stop()
-        await websocket_server.stop()
+        if provider_started:
+            provider.stop()
+        if static_started:
+            static_server.stop()
+        if websocket_started:
+            await websocket_server.stop()
         LOGGER.info("vpook shutdown complete.")
 
 
