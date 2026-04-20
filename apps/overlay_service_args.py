@@ -76,14 +76,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--talking-glow-color",
-        default="rgba(255, 16, 240, 0.7)",
+        default="rgba(255, 15, 148, 0.91)",
         metavar="COLOR",
-        help="CSS color for the talking glow, for example '#ff66cc' or 'rgba(255, 16, 240, 0.7)'.",
+        help="CSS color for the talking glow, for example '#ff66cc' or 'rgba(255, 15, 148, 0.91)'.",
     )
     parser.add_argument(
         "--talking-glow-intensity",
         type=float,
-        default=0.1,
+        default=0.5,
         metavar="FLOAT",
         help="Multiplier for talking glow size and strength.",
     )
