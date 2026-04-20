@@ -35,8 +35,7 @@
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-python -m pip install -e .[windows-audio]
+make install-windows
 ```
 
 If PowerShell blocks activation:
@@ -52,8 +51,7 @@ The fake provider works cross-platform for development.
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e .
+make install
 ```
 
 ## Running The Service
@@ -64,7 +62,8 @@ From the repo root:
 python apps/overlay_service.py
 ```
 
-The entrypoint now bootstraps `src/` automatically, so you do not need to set `PYTHONPATH`.
+This expects `vpook` to be installed into the active environment, which `make install`
+and `make install-windows` do in editable mode.
 
 Once the service is running:
 
@@ -209,13 +208,24 @@ Edit these in `AppConfig`:
 
 ### `ModuleNotFoundError: No module named 'vpook'`
 
-This was fixed in `apps/overlay_service.py` by adding the repo `src/` directory to `sys.path`. Running from the repo root with:
+`vpook` uses a `src/` layout, so `python apps/overlay_service.py` only works after the
+package is installed into the active environment. From the repo root, run:
+
+```bash
+make install
+```
+
+On Windows, use:
+
+```powershell
+make install-windows
+```
+
+Then rerun:
 
 ```bash
 python apps/overlay_service.py
 ```
-
-should be the expected path.
 
 ### WebSocket Or HTTP Bind Errors
 

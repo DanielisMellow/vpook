@@ -38,6 +38,13 @@ def create_audio_provider(config: AppConfig) -> AudioProvider:
         )
 
         return WindowsWasapiProvider(device_name=config.audio_device)
+    if config.provider == "windows-audio-session":
+        from vpook.audio.windows_audio_session_provider import (  # noqa: PLC0415
+            WindowsAudioSessionProvider,
+        )
+
+        process = config.target_process or "discord"
+        return WindowsAudioSessionProvider(process_name=process)
     LOGGER.error("Unsupported audio provider requested: %s", config.provider)
     raise ValueError(f"Unsupported audio provider: {config.provider}")
 

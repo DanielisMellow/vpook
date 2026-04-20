@@ -42,6 +42,9 @@ class AppConfig:
     audio_device: str | None = (
         None  # Loopback device name substring; None = system default
     )
+    target_process: str | None = (
+        None  # Process name substring for windows-audio-session provider
+    )
     websocket_host: str = "127.0.0.1"
     websocket_port: int = 8765
     http_host: str = "127.0.0.1"
