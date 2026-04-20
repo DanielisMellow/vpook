@@ -6,8 +6,8 @@
 
 - Serves the overlay UI at `http://127.0.0.1:8000`
 - Broadcasts live voice state at `ws://127.0.0.1:8765`
-- Supports a fake audio provider for development
-- Supports Windows WASAPI loopback for real system-audio capture
+- Detects voice activity with configurable threshold, attack, and release timing
+- Supports three audio backends (fake, full-device loopback, per-app session metering)
 - Serves avatar assets from `apps/assets`
 
 ## Repository Layout
@@ -25,8 +25,8 @@
 ## Requirements
 
 - Python `3.12+`
-- Windows if you want live WASAPI loopback audio
-- OBS or any browser source consumer if you want to use the overlay visually
+- Windows for live audio capture (WASAPI loopback or per-app session metering)
+- OBS or any browser source consumer to display the overlay visually
 
 ## Setup
 
@@ -70,27 +70,37 @@ Once the service is running:
 - Open `http://127.0.0.1:8000` in a browser to preview the overlay
 - Add that URL as a Browser Source in OBS if you want to use it in a scene
 
-## Switching Between Fake And Real Audio
+## Selecting An Audio Provider
 
-The main runtime toggle lives in `apps/overlay_service.py`.
+All provider config lives in `apps/overlay_service.py`. Enable exactly one of the three flags.
 
-By default:
+### Fake (default — cross-platform)
 
-- `USE_FAKE_AUDIO = True`
-- The service uses a deterministic fake signal so the avatar visibly animates
+```python
+USE_FAKE_AUDIO = True
+```
 
-For real Windows audio capture:
+Generates a deterministic idle/talking cycle. No audio hardware required. Good for verifying the overlay and WebSocket transport without needing Windows.
 
-- Set `USE_FAKE_AUDIO = False`
-- Optionally set `WINDOWS_LOOPBACK_DEVICE_NAME` to part of a speaker or headset name
-- If `WINDOWS_LOOPBACK_DEVICE_NAME` is `None`, the app tries to mirror the default Windows output device
-
-Example:
+### Device loopback — capture everything on an output device
 
 ```python
 USE_FAKE_AUDIO = False
-WINDOWS_LOOPBACK_DEVICE_NAME = "Headphones"
+USE_DEVICE_LOOPBACK = True
+WINDOWS_LOOPBACK_DEVICE_NAME = None  # None = system default; or e.g. "Headphones"
 ```
+
+Captures the full mix of whatever is playing through a Windows output device via WASAPI loopback. Picks up all apps at once — Discord, game audio, music, everything.
+
+### Per-app session metering — isolate one application
+
+```python
+USE_FAKE_AUDIO = False
+USE_PROCESS_AUDIO = True
+TARGET_PROCESS = "discord"  # case-insensitive substring of the .exe name
+```
+
+Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak volume for a specific process only. Discord is the default target. Useful when streaming — the game audio won't bleed into voice detection. The service auto-recovers if the target app is restarted.
 
 ## Assets
 
@@ -147,6 +157,12 @@ Current defaults from `AppConfig`:
 - Captures Windows system output audio through WASAPI loopback.
 - Computes RMS volume from audio buffers.
 - Applies a small smoothing window to reduce visual strobing.
+
+`src/vpook/audio/windows_audio_session_provider.py`
+
+- Uses `IAudioMeterInformation` (Windows Audio Session API via `pycaw`) to meter a specific process's audio output.
+- Tracks all audio sessions matching the target process name and takes the peak across them.
+- Re-enumerates sessions every 5 seconds so the provider recovers automatically if the app restarts.
 
 `src/vpook/state/voice_state.py`
 
@@ -237,10 +253,16 @@ If you see an address-in-use or bind failure:
 
 ### No Real Audio On Windows
 
-- make sure you installed `.[windows-audio]`
-- set `USE_FAKE_AUDIO = False`
-- confirm the selected output device is active
-- if needed, set `WINDOWS_LOOPBACK_DEVICE_NAME` to a substring of the target device name
+**Device loopback (`USE_DEVICE_LOOPBACK`):**
+- confirm `.[windows-audio]` was installed (`make install-windows`)
+- confirm the selected output device is active and playing audio
+- set `WINDOWS_LOOPBACK_DEVICE_NAME` to a substring of the target device name if the default isn't picked up
+
+**Per-app session metering (`USE_PROCESS_AUDIO`):**
+- confirm `.[windows-audio]` was installed (`make install-windows`)
+- make sure the target app is open and joined to a voice channel — Windows only creates an audio session once the app is actively outputting audio
+- if the app was just launched, wait up to 5 seconds for the session to be discovered
+- check logs for `No active audio sessions found for process '...'`
 
 ### Overlay Loads But Never Animates
 
