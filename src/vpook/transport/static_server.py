@@ -128,6 +128,8 @@ class StaticServer:
                         "avatar": {
                             "idle": config.avatar.idle_image,
                             "talking": config.avatar.talking_image,
+                            "talkingGlowColor": config.avatar.talking_glow_color,
+                            "talkingGlowIntensity": config.avatar.talking_glow_intensity,
                         },
                     }
                     self._serve_bytes(
@@ -183,6 +185,9 @@ class StaticServer:
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 if include_body:
-                    self.wfile.write(payload)
+                    try:
+                        self.wfile.write(payload)
+                    except BrokenPipeError:
+                        pass
 
         return Handler

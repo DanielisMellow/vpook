@@ -8,15 +8,19 @@ from pathlib import Path
 
 @dataclass(slots=True)
 class AvatarConfig:
-    """Paths to idle and talking avatar images.
+    """Paths and talking-state styling for avatar images.
 
     Attributes:
         idle_image: HTTP path for the idle avatar image.
         talking_image: HTTP path for the talking avatar image.
+        talking_glow_color: CSS color used for the talking glow effect.
+        talking_glow_intensity: Multiplier applied to the talking glow size.
     """
 
     idle_image: str = "/assets/pookie/idle.png"
     talking_image: str = "/assets/pookie/talking.png"
+    talking_glow_color: str = "rgba(80, 220, 255, 0.9)"
+    talking_glow_intensity: float = 1.0
 
 
 @dataclass(slots=True)

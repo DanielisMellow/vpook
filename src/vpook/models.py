@@ -51,10 +51,14 @@ class AvatarConfig:
     Attributes:
         idle_image: HTTP path to the idle avatar image.
         talking_image: HTTP path to the talking avatar image.
+        talking_glow_color: CSS color used for the talking glow effect.
+        talking_glow_intensity: Multiplier applied to the talking glow size.
     """
 
     idle_image: str
     talking_image: str
+    talking_glow_color: str
+    talking_glow_intensity: float
 
 
 @dataclass(slots=True)

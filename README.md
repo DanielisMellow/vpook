@@ -168,6 +168,9 @@ Uses the Windows Audio Session API (`IAudioMeterInformation`) to read the peak v
 --threshold FLOAT           Volume threshold for VAD (default: 0.08)
 --attack-ms MS              Time above threshold before switching to talking (default: 120)
 --release-ms MS             Time below threshold before switching to idle (default: 300)
+--talking-glow-color COLOR  CSS color for the talking glow
+--talking-glow-intensity FLOAT
+                            Multiplier for talking glow size and strength
 --host HOST                 Bind address for both HTTP and WebSocket (overrides --http-host and --websocket-host)
 --http-host HOST            HTTP bind address (default: 127.0.0.1)
 --http-port PORT            HTTP port (default: 8000)

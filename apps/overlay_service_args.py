@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from vpook.config import AppConfig
+from vpook.config import AppConfig, AvatarConfig
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -74,6 +74,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="MS",
         help="Time below threshold before switching to idle.",
     )
+    parser.add_argument(
+        "--talking-glow-color",
+        default="rgba(255, 16, 240, 0.7)",
+        metavar="COLOR",
+        help="CSS color for the talking glow, for example '#ff66cc' or 'rgba(255, 16, 240, 0.7)'.",
+    )
+    parser.add_argument(
+        "--talking-glow-intensity",
+        type=float,
+        default=0.1,
+        metavar="FLOAT",
+        help="Multiplier for talking glow size and strength.",
+    )
 
     # Transport
     parser.add_argument(
@@ -120,4 +133,8 @@ def build_config(args: argparse.Namespace) -> AppConfig:
         websocket_host=host if host is not None else args.websocket_host,
         websocket_port=args.websocket_port,
         tick_ms=args.tick_ms,
+        avatar=AvatarConfig(
+            talking_glow_color=args.talking_glow_color,
+            talking_glow_intensity=max(args.talking_glow_intensity, 0.0),
+        ),
     )

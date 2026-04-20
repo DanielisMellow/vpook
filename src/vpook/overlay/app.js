@@ -11,10 +11,16 @@ function applyState(state) {
   const volume = Number(state.volume || 0);
   const talking = Boolean(state.talking);
   const stretch = Math.min(volume, 1);
+  const glowIntensity = Math.max(Number(avatarConfig.talkingGlowIntensity || 1), 0);
+  const glowColor = avatarConfig.talkingGlowColor || "rgba(80, 220, 255, 0.9)";
   const translateY = talking ? -8 - stretch * 14 : -stretch * 4;
   const scaleX = talking ? 1 + stretch * 0.05 : 1 - stretch * 0.01;
   const scaleY = talking ? 1 - stretch * 0.07 : 1 + stretch * 0.02;
   const brightness = talking ? 1 + stretch * 0.18 : 1;
+  const glow = talking
+    ? `drop-shadow(0 0 ${(24 + stretch * 18) * glowIntensity}px ${glowColor})
+       drop-shadow(0 0 ${(48 + stretch * 24) * glowIntensity}px ${glowColor})`
+    : "drop-shadow(0 10px 24px rgba(0, 0, 0, 0.22))";
 
   const targetSource = talking ? avatarConfig.talking : avatarConfig.idle;
   if (currentSource !== targetSource) {
@@ -23,7 +29,7 @@ function applyState(state) {
   }
 
   avatarEl.style.transform = `translateY(${translateY}px) scaleX(${scaleX}) scaleY(${scaleY})`;
-  avatarEl.style.filter = `brightness(${brightness}) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.22))`;
+  avatarEl.style.filter = `brightness(${brightness}) ${glow}`;
   avatarEl.style.opacity = talking ? "1" : "0.98";
 }
 
