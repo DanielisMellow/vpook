@@ -1,6 +1,5 @@
 # Makefile for the Stream repository
-PYTHON ?= python
-PIP := $(PYTHON) -m pip
+UV       ?= uv
 LINT_CFG := ./pyproject.toml
 PY_DIRS  := src/ apps/
 
@@ -8,11 +7,12 @@ PY_DIRS  := src/ apps/
 help:
 	@echo "Available targets:"
 	@echo "  help              - Display this help message"
-	@echo "  install           - Install vpook in editable mode in the active environment"
-	@echo "  install-windows   - Install vpook with Windows audio extras in editable mode"
+	@echo "  install           - Sync the environment (project + dev group)"
+	@echo "  install-windows   - Sync the environment with Windows audio extras"
 	@echo "  run               - Run the overlay service (fake audio by default)"
 	@echo "  run-discord       - Run the overlay service targeting Discord audio"
 	@echo "  run-lan           - Run the overlay service bound to all interfaces for LAN access (WASAPI)"
+	@echo "  test              - Run the test suite"
 	@echo "  lint              - Run ruff check (concise, non-failing)"
 	@echo "  lint-verbose      - Run ruff check (full output, non-failing)"
 	@echo "  format            - Apply ruff formatting to the repository"
@@ -21,43 +21,46 @@ help:
 # -------- Installation --------
 .PHONY: install
 install:
-	@$(PIP) install --upgrade setuptools wheel
-	@$(PIP) install -e . --no-build-isolation
+	@$(UV) sync
 
 .PHONY: install-windows
 install-windows:
-	@$(PIP) install --upgrade setuptools wheel
-	@$(PIP) install -e .[windows-audio] --no-build-isolation
+	@$(UV) sync --extra windows-audio
 
 # -------- Run --------
 .PHONY: run
 run:
-	@$(PYTHON) apps/overlay_service.py $(ARGS)
+	@$(UV) run apps/overlay_service.py $(ARGS)
 
 .PHONY: run-discord
 run-discord:
-	@$(PYTHON) apps/overlay_service.py --process --target-process discord $(ARGS)
+	@$(UV) run apps/overlay_service.py --process --target-process discord $(ARGS)
 
 .PHONY: run-lan
 run-lan:
-	@$(PYTHON) apps/overlay_service.py --host 0.0.0.0 --wasapi $(ARGS)
+	@$(UV) run apps/overlay_service.py --host 0.0.0.0 --wasapi $(ARGS)
+
+# -------- Test --------
+.PHONY: test
+test:
+	@$(UV) run pytest
 
 # -------- Linting (dev) --------
 .PHONY: lint
 lint:
-	-@ruff check --config $(LINT_CFG) --output-format concise $(PY_DIRS)
+	-@$(UV) run ruff check --config $(LINT_CFG) --output-format concise $(PY_DIRS)
 
 .PHONY: lint-verbose
 lint-verbose:
-	-@ruff check --config $(LINT_CFG) $(PY_DIRS)
+	-@$(UV) run ruff check --config $(LINT_CFG) $(PY_DIRS)
 
 # -------- Formatting (dev) ---------
 .PHONY: format
 format:
-	@ruff format $(PY_DIRS) --config $(LINT_CFG)
+	@$(UV) run ruff format $(PY_DIRS) --config $(LINT_CFG)
 
 .PHONY: format-diff
 format-diff:
-	@ruff format --diff $(PY_DIRS) --config $(LINT_CFG)
+	@$(UV) run ruff format --diff $(PY_DIRS) --config $(LINT_CFG)
 
 # -------- Fail on Error (CI/CD) --------

@@ -26,69 +26,59 @@
 ## Requirements
 
 - Windows (for live audio capture via WASAPI)
-- Python 3.12
-- [`just`](https://github.com/casey/just) task runner
+- Python 3.12+ (`uv` can install this for you)
+- [`uv`](https://docs.astral.sh/uv/) for environment and dependency management
+- [`just`](https://github.com/casey/just) task runner (optional — wraps the `uv` commands)
 - OBS or any browser source consumer to display the overlay visually
 
 ## Setup
 
+`uv` creates and manages the virtual environment for you — no manual `venv`
+creation or activation required. Install `uv` from
+<https://docs.astral.sh/uv/getting-started/installation/> if you don't have it.
+
 ### Windows PowerShell
-
-**1. Install Python 3.12**
-
-```powershell
-winget install Python.Python.3.12
-```
-
-Close and reopen PowerShell after this so `python` is on your PATH.
-
-**2. Install `just`**
-
-```powershell
-winget install Casey.Just
-```
-
-**3. Clone the repo and create a virtual environment**
 
 ```powershell
 git clone <repo-url>
 cd vpook
-python -m venv .venv
+uv sync --extra windows-audio
 ```
 
-**4. Activate the virtual environment**
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-If PowerShell blocks activation, run this once and then retry step 4:
+If PowerShell blocks scripts when you later run `just`, run this once:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
-
-**5. Install vpook**
-
-```powershell
-just install-windows
-```
-
-You should see `(.venv)` in your prompt before running any `just` commands. Re-run step 4 any time you open a new terminal.
 
 ### macOS or Linux
 
 The fake provider works cross-platform for development.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-just install
+uv sync
+```
+
+### Install as a CLI tool (optional)
+
+To get a `vpook` command on your PATH (handy for scripting / streamer setups):
+
+```bash
+uv tool install .
+# update later with:  uv tool upgrade vpook
 ```
 
 ## Running The Service
 
-From the repo root with the virtual environment active:
+`uv run` syncs the environment automatically before running, so no activation is
+needed:
+
+```bash
+uv run apps/overlay_service.py                 # fake audio (default)
+uv run vpook --process --target-process discord  # via the console script
+```
+
+Or with the `just` task runner:
 
 ```bash
 just run               # fake audio (default, cross-platform)

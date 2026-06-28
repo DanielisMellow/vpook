@@ -11,6 +11,9 @@ dependencies = [
   "websockets>=12,<16",
 ]
 
+[project.scripts]
+vpook = "vpook.cli:main"
+
 [project.optional-dependencies]
 windows-audio = [
   "numpy>=1.26",
